@@ -24,9 +24,26 @@ const P: Record<string, string> = {
   coller: 'M8 4h8v3H8zM6 6H4v15h16V6h-2',
   modifier: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
   sac: 'M5 8h14l-1 13H6zM9 8V6a3 3 0 0 1 6 0v2',
+  ampoule: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z',
+  rien: 'M12 8v4M12 16h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
+  menu: 'M4 6h16M4 12h16M4 18h16',
+  plusActions: 'M5 12h.01M12 12h.01M19 12h.01',
+  poignee: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
+  groupe: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-7 10v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6',
+  // Catégories
+  'cat-nourriture': 'M4 8h16v12H4zM4 8l3-4h10l3 4M12 8v12',
+  'cat-boisson': 'M10 2h4v4l2 3v12H8V9l2-3zM8 13h8',
+  'cat-artisanat': 'M12 3c4 0 7 3 7 7 0 2-1.5 3-3 3h-2a2 2 0 0 0-1 3.7c.6.4.5 1.3-.2 1.3H12a9 9 0 0 1 0-18zM7.5 11h.01M10 7h.01M15 7.5h.01',
+  'cat-cuisine': 'M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 0-3 2-3 5s1 4 3 4v9',
+  'cat-textile': 'M4 6h16v12H4zM4 10h16M4 14h16',
+  'cat-papeterie': 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
+  'cat-deco': 'M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6',
+  'cat-beaute': 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z',
+  'cat-pop': 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z',
+  'cat-the': 'M4 8h13v5a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 2v3M12 2v3',
 };
 
-export function Icon({ n, taille = 20, titre }: { n: keyof typeof P | string; taille?: number; titre?: string }) {
+export function Icon({ n, taille = 20, titre, epaisseur = 1.8 }: { n: keyof typeof P | string; taille?: number; titre?: string; epaisseur?: number }) {
   return (
     <svg
       class="icon"
@@ -35,7 +52,7 @@ export function Icon({ n, taille = 20, titre }: { n: keyof typeof P | string; ta
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      stroke-width="1.8"
+      stroke-width={epaisseur}
       stroke-linecap="round"
       stroke-linejoin="round"
       aria-hidden={titre ? undefined : 'true'}

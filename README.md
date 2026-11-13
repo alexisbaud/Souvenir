@@ -5,6 +5,14 @@ Web app personnelle pour suivre ses souvenirs de voyage : quoi acheter, pour qui
 - Application web installable (PWA), en français, utilisable sur téléphone et sur ordinateur.
 - Données stockées **sur l'appareil** (IndexedDB), sans compte ni serveur. Fonctionne hors connexion, sauf l'IA et la mise à jour des taux.
 - Phases 1 et 2 livrées : personnes et groupes, idées et achats (lots, cadeaux collectifs, « Moi »), écran Ici et dernière chance, lieux d'achat, assistant IA (lieux, suggestions, file automatique, mode copier-coller), photo, journal, détaxe, douane, bagages, remise, sauvegarde.
+- Un code couleur unique pour l'état d'un cadeau : gris pointillé = rien, orange = idée, bleu = acheté, vert = donné.
+
+## Prise en main
+
+- **Ajouter** : bouton « + ». Tapez quoi, touchez les personnes concernées, et indiquez le prix si c'est déjà acheté (sans prix, c'est une idée).
+- **Ici** : où vous êtes, ce qu'il ne faut pas rater (« Dernière chance »), ce qu'on peut acheter dans la ville avec le bouton « Je l'ai acheté ».
+- **Personnes** : une carte par personne avec ses cadeaux et idées. Glissez une carte sur un autre groupe pour l'y déplacer (sur téléphone : appui long, puis glisser). Créez un groupe en bas de la liste.
+- **Retour** : détaxe, douane, bagages, puis remise des cadeaux en France.
 
 **Adresse :** https://alexisbaud.github.io/Souvenir/
 

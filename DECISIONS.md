@@ -7,6 +7,19 @@ Ce fichier consigne les choix techniques et les interprétations de la spécific
 - **Phases 1 et 2** livrées ensemble (décision d'Alexis, 13/11/2026 : la phase 2 était attendue pour le 12/11). La phase 3 (multi-voyages, modèles de profils douaniers) n'a pas d'écran ; le modèle de données la prévoit déjà (voyages, `voyageId` partout, destinataires par voyage).
 - **Ordinateur et téléphone** : l'interface est responsive (barre d'onglets en bas sur téléphone, navigation latérale à partir de 900 px, feuilles modales centrées sur grand écran). Les données restent **locales à chaque appareil** (pas de synchronisation, §13) ; on passe de l'un à l'autre par Exporter/Importer (décision d'Alexis).
 
+## Refonte de l'interface (13/11/2026)
+
+Validée par Alexis à partir de maquettes cliquables. Elle s'écarte volontairement du §10 « sobre, une seule couleur d'accent, aucun décor » :
+
+- **Un code couleur par état, partout** : Rien (gris pointillé), Idée (orange), Acheté (bleu), Donné (vert). Toujours accompagné d'une icône et d'un libellé (§10 : jamais la couleur seule). Le rouge reste réservé aux alertes.
+- **Cartes** plutôt que des lignes ; **avatars** à initiales dont l'anneau porte l'état ; **tuiles** de catégorie (ou la photo) colorées selon l'état.
+- **Quatre onglets** : Ici · Cadeaux · Personnes · Retour. Le journal est accessible depuis Cadeaux, les paramètres depuis l'en-tête.
+- **Ajout rapide en un seul écran** : « Quoi ? », « Pour qui ? » (avatars à toucher), prix. Sans prix, c'est une idée ; avec un prix, c'est un achat. Date, étape et boutique sont devinées ; le reste est replié.
+- **Personnes** : une carte par personne avec ses cadeaux et idées ; les groupes sont des zones. On change une personne de groupe par **glisser-déposer** (souris : glisser ; tactile : appui long puis glisser, défilement automatique près des bords), sans menu déroulant. Création de groupe en bas de la liste.
+- **Fiche souvenir en lecture** : avancement Idée → Acheté → Donné, pastilles « retour » (« Tranchant : en soute »), bouton « Donné » par destinataire ; les modifications passent par des feuilles (crayon, « Changer », « Modifier »).
+- **En-tête Ici** : la ville en grand (« Kyoto ») et « Nuit 4 sur 6 » en sous-titre, au lieu de « Kyoto · nuit 4/6 » sur une ligne (le libellé RG-07 reste disponible pour les lecteurs d'écran).
+- Vocabulaire : « Pour qui ? » au lieu d'« Attribuer », « N sans destinataire » au lieu de « k/N attribués ».
+
 ## Stack
 
 | Besoin | Choix | Raison |

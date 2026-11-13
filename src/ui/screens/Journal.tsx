@@ -6,7 +6,8 @@ import { formatDate } from '../../domain/dates';
 import { euro, yen } from '../../domain/format';
 import { nomEtape, useDb, useVoyage } from '../data';
 import { Section, Selecteur, Vide } from '../components/ui';
-import { SouvenirLigne } from '../components/SouvenirLigne';
+import { CarteSouvenir } from '../components/CarteSouvenir';
+import { Retour as RetourLien } from './Personnes';
 import { libelleEtape } from '../components/champs';
 
 export function journalParJour(achats: Souvenir[]): { date: string; etapes: string[]; souvenirs: Souvenir[]; yen: number; eur: number }[] {
@@ -43,8 +44,9 @@ export function Journal() {
     .filter((x) => x.n > 0);
   return (
     <div class="ecran">
+      <RetourLien href="souvenirs?seg=achetes" libelle="Cadeaux" />
       <div class="ecran-tete">
-        <h1>Journal</h1>
+        <h1>Journal des achats</h1>
         <Selecteur valeur={etape} onValeur={setEtape} vide="Toutes les étapes" options={etapes.map((e) => ({ id: e.id, libelle: libelleEtape(e, etapes) }))} />
       </div>
       {jours.length === 0 ? (
@@ -63,9 +65,9 @@ export function Journal() {
               </span>
             }
           >
-            <ul class="liste">
+            <ul class="cartes-souvenirs">
               {j.souvenirs.map((s) => (
-                <SouvenirLigne db={db} s={s} attrs={idx.get(s.id) ?? []} />
+                <CarteSouvenir db={db} s={s} attrs={idx.get(s.id) ?? []} masquerEtat />
               ))}
             </ul>
           </Section>

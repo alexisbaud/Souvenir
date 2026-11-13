@@ -34,7 +34,7 @@ export async function aller(page: Page, chemin: string) {
 
 export async function creerPersonne(page: Page, nom: string, groupe?: string) {
   await aller(page, 'personnes');
-  await page.locator('.ecran-tete').getByRole('button', { name: 'Personne' }).click();
+  await page.locator('.ecran-tete').getByRole('button', { name: 'Personne', exact: true }).click();
   const f = feuille(page);
   await f.getByLabel('Nom', { exact: true }).fill(nom);
   if (groupe) await f.locator('select').selectOption({ label: groupe });
@@ -42,10 +42,9 @@ export async function creerPersonne(page: Page, nom: string, groupe?: string) {
   await expect(page.locator('.feuille')).toHaveCount(0);
 }
 
-export async function ouvrirSaisie(page: Page, type: 'Idée' | 'Achat') {
+export async function ouvrirSaisie(page: Page) {
   await aller(page, 'ici');
   await page.getByRole('button', { name: 'Ajouter une idée ou un achat' }).click();
-  await page.locator('.choix-saisie').getByRole('button', { name: new RegExp('^' + type) }).click();
 }
 
 export async function puce(page: Page, nom: string) {
@@ -66,20 +65,23 @@ export async function achat(
     alcool?: { degre: string; volume: string };
   },
 ) {
-  await ouvrirSaisie(page, 'Achat');
+  await ouvrirSaisie(page);
   const f = feuille(page);
-  await f.getByPlaceholder('Ex. Tenugui').fill(o.nom);
+  await f.getByLabel('Quoi ?').fill(o.nom);
   await f.getByLabel('Prix en yens').fill(String(o.prix));
   for (const p of o.pour ?? []) await puce(page, p);
-  for (const g of o.groupes ?? []) await puce(page, 'Groupe ' + g);
-  if (o.quantite) {
-    const q = f.getByRole('textbox', { name: 'Quantité' });
-    await q.fill(String(o.quantite));
-    await q.press('Tab');
+  for (const g of o.groupes ?? []) await puce(page, 'Tout le groupe ' + g);
+  if (o.boutique) {
+    await f.getByRole('button', { name: 'Changer' }).click();
+    await f.getByPlaceholder('Facultatif').fill(o.boutique);
   }
-  if (o.boutique) await f.getByPlaceholder('Facultatif').fill(o.boutique);
-  if (o.detaxe || o.alcool) {
-    await f.getByText('Catégorie, photo, détaxe, retour').click();
+  if (o.quantite || o.detaxe || o.alcool) {
+    await f.getByText('Photo, quantité, détaxe, alcool…').click();
+    if (o.quantite) {
+      const q = f.getByRole('textbox', { name: 'Quantité' });
+      await q.fill(String(o.quantite));
+      await q.press('Tab');
+    }
     if (o.detaxe) await f.getByRole('checkbox', { name: /^Détaxé/ }).check();
     if (o.alcool) {
       await f.getByText('Alcool', { exact: true }).click();
@@ -96,9 +98,9 @@ export async function achat(
 }
 
 export async function idee(page: Page, nom: string, pour: string[] = []) {
-  await ouvrirSaisie(page, 'Idée');
+  await ouvrirSaisie(page);
   const f = feuille(page);
-  await f.getByLabel('Nom', { exact: true }).fill(nom);
+  await f.getByLabel('Quoi ?').fill(nom);
   for (const p of pour) await puce(page, p);
   await f.getByRole('button', { name: "Enregistrer l'idée" }).click();
   await expect(page.locator('.feuille')).toHaveCount(0);
@@ -106,7 +108,7 @@ export async function idee(page: Page, nom: string, pour: string[] = []) {
 
 export async function ouvrirSouvenir(page: Page, nom: string, segment = 'idees') {
   await aller(page, 'souvenirs?seg=' + segment);
-  await page.locator('.souvenir-ligne').filter({ hasText: nom }).first().locator('a.ligne-lien').click();
+  await page.locator('.carte-souvenir').filter({ hasText: nom }).first().locator('a.carte-souvenir-tete').click();
   await expect(page.locator('main h1')).toHaveText(nom);
 }
 

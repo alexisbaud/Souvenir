@@ -18,14 +18,15 @@ import {
 
 test('S1 Première ouverture le 2026-11-02', async ({ page }) => {
   await demarrer(page, '2026-11-02');
-  await expect(page.locator('main h1')).toHaveText('Kyoto · nuit 4/6');
+  await expect(page.locator('main h1')).toHaveText('Kyoto');
+  await expect(page.locator('.hero')).toContainText('Nuit 4 sur 6');
   await expect(page.locator('.entete-voyage')).toHaveText('Japon 2026');
   await aller(page, 'parametres/voyage');
   await expect(page.getByText('Étapes (12)')).toBeVisible();
   await aller(page, 'personnes');
   await expect(page.getByText("Aucun destinataire pour l'instant", { exact: false })).toBeVisible();
-  await expect(page.locator('.personne-ligne')).toHaveCount(1);
-  await expect(page.locator('.personne-ligne')).toContainText('Moi');
+  await expect(page.locator('.carte-personne')).toHaveCount(1);
+  await expect(page.locator('.carte-personne')).toContainText('Moi');
   // F-31 CA2 : jour de transition
   await changerDate(page, '2026-11-05');
   await expect(page.locator('main h1')).toHaveText('Kyoto → Osaka');
@@ -36,16 +37,16 @@ test('S2 Achat express d’un lot réparti', async ({ page }) => {
   for (const n of ['Léa', 'Hugo', 'Inès', 'Tom']) await creerPersonne(page, n, 'Amis');
   await achat(page, { nom: 'Tenugui', prix: 6600, pour: ['Léa', 'Hugo', 'Inès', 'Tom', 'Moi'], quantite: 6 });
   await aller(page, 'souvenirs?seg=a_attribuer');
-  const ligne = page.locator('.souvenir-ligne').filter({ hasText: 'Tenugui' });
+  const ligne = page.locator('.carte-souvenir').filter({ hasText: 'Tenugui' });
   await expect(ligne).toContainText('×6');
-  await expect(ligne).toContainText('5/6 attribués');
+  await expect(ligne).toContainText('1 sans destinataire');
   await aller(page, 'ici');
   await expect(page.locator('.total')).toContainText('6 600 ¥');
   await expect(page.getByText('dont pour moi')).toContainText('1 100 ¥');
-  await expect(page.locator('.compteur').filter({ hasText: 'Achats à attribuer' })).toContainText('1');
+  await expect(page.getByRole('link', { name: '1 achat sans destinataire →' })).toBeVisible();
   await aller(page, 'personnes');
   for (const n of ['Léa', 'Hugo', 'Inès', 'Tom'])
-    await expect(page.locator('.personne-ligne').filter({ hasText: n })).toContainText('Acheté');
+    await expect(page.locator('.carte-personne-tete').filter({ hasText: n })).toContainText('Acheté');
 });
 
 test('S3 Cadeau collectif au groupe Collègues', async ({ page }) => {
@@ -54,11 +55,11 @@ test('S3 Cadeau collectif au groupe Collègues', async ({ page }) => {
   for (const n of noms) await creerPersonne(page, n, 'Collègues');
   await achat(page, { nom: 'Boîte de 24 douceurs', prix: 2400, groupes: ['Collègues'] });
   await aller(page, 'personnes');
-  for (const n of noms) await expect(page.locator('.personne-ligne').filter({ hasText: n })).toContainText('Acheté · collectif');
+  for (const n of noms) await expect(page.locator('.carte-personne-tete').filter({ hasText: n })).toContainText('Acheté · collectif');
   await ouvrirSouvenir(page, 'Boîte de 24 douceurs', 'achetes');
   await page.locator('.attribution').getByRole('button', { name: 'Donné' }).click();
   await aller(page, 'personnes');
-  for (const n of noms) await expect(page.locator('.personne-ligne').filter({ hasText: n })).toContainText('Donné · collectif');
+  for (const n of noms) await expect(page.locator('.carte-personne-tete').filter({ hasText: n })).toContainText('Donné · collectif');
 });
 
 test('S4 Achat partiel d’une idée', async ({ page }) => {
@@ -67,17 +68,17 @@ test('S4 Achat partiel d’une idée', async ({ page }) => {
   await creerPersonne(page, 'Hugo');
   await idee(page, 'Baguettes laquées', ['Léa', 'Hugo']);
   await ouvrirSouvenir(page, 'Baguettes laquées');
-  await page.getByRole('button', { name: 'Marquer acheté' }).click();
+  await page.getByRole('button', { name: "Je l'ai acheté" }).click();
   await puce(page, 'Hugo'); // décocher Hugo
   await feuille(page).getByLabel('Prix en yens').fill('1800');
   await feuille(page).getByRole('button', { name: "Enregistrer l'achat" }).click();
   await aller(page, 'souvenirs?seg=idees');
-  const ideeL = page.locator('.souvenir-ligne').filter({ hasText: 'Baguettes laquées' });
+  const ideeL = page.locator('.carte-souvenir').filter({ hasText: 'Baguettes laquées' });
   await expect(ideeL).toHaveCount(1);
   await expect(ideeL).toContainText('Hugo');
   await expect(ideeL).not.toContainText('Léa');
   await aller(page, 'souvenirs?seg=achetes');
-  const achatL = page.locator('.souvenir-ligne').filter({ hasText: 'Baguettes laquées' });
+  const achatL = page.locator('.carte-souvenir').filter({ hasText: 'Baguettes laquées' });
   await expect(achatL).toContainText('Léa');
   await expect(achatL).not.toContainText('Hugo');
 });
@@ -131,11 +132,10 @@ test('S6 IA automatique : recherche de lieux puis alerte bagage', async ({ page 
   expect(ctx).toContain('enregistrer_lieux');
   expect(ctx).not.toContain('takayama');
   // tranchant proposé par l'IA
-  const bascule = page.getByRole('button', { name: 'Retour', exact: true });
-  if ((await bascule.getAttribute('aria-expanded')) === 'false') await bascule.click();
+  await page.getByText('Contraintes de retour (alcool, bagage, douane…)').click();
   await expect(page.getByRole('button', { name: 'Tranchant · IA' })).toHaveAttribute('aria-pressed', 'true');
   // Achat puis rangement en cabine
-  await page.getByRole('button', { name: 'Marquer acheté' }).click();
+  await page.getByRole('button', { name: "Je l'ai acheté" }).click();
   await feuille(page).getByLabel('Prix en yens').fill('22000');
   await feuille(page).getByRole('button', { name: "Enregistrer l'achat" }).click();
   await aller(page, 'retour?section=bagages');
@@ -193,7 +193,7 @@ test('S9 Remise après le voyage', async ({ page }) => {
   await page.locator('.groupe-remise').getByRole('button', { name: 'Donné' }).click();
   await expect(page.getByText('Remise · 1/1 remis')).toBeVisible();
   await aller(page, 'personnes');
-  await expect(page.locator('.personne-ligne').filter({ hasText: 'Léa' })).toContainText('Donné');
+  await expect(page.locator('.carte-personne-tete').filter({ hasText: 'Léa' })).toContainText('Donné');
   await aller(page, 'ici');
   // Annulation depuis la liste des derniers remis
   await page.getByText('Derniers remis').click();
@@ -233,12 +233,12 @@ test('S10 Sauvegarde puis restauration sur une installation vierge', async ({ pa
   await demarrer(p2, '2026-11-02', 'parametres/sauvegarde');
   await p2.locator('input[type=file]').setInputFiles(fichier);
   await feuille(p2).getByRole('button', { name: 'Importer' }).click();
-  await expect(p2.locator('main h1')).toHaveText('Kyoto · nuit 4/6');
+  await expect(p2.locator('main h1')).toHaveText('Kyoto');
   await aller(p2, 'personnes');
-  await expect(p2.locator('.personne-ligne').filter({ hasText: 'Léa' })).toContainText('Acheté');
+  await expect(p2.locator('.carte-personne-tete').filter({ hasText: 'Léa' })).toContainText('Acheté');
   await aller(p2, 'souvenirs?seg=achetes');
-  await expect(p2.locator('.souvenir-ligne').filter({ hasText: 'Tenugui' })).toContainText('1 500 ¥');
-  await expect(p2.locator('.souvenir-ligne img.miniature')).toBeVisible();
+  await expect(p2.locator('.carte-souvenir').filter({ hasText: 'Tenugui' })).toContainText('1 500 ¥');
+  await expect(p2.locator('.carte-souvenir img.miniature')).toBeVisible();
   await aller(p2, 'parametres/ia');
   await expect(p2.getByPlaceholder('sk-ant-…')).toBeVisible(); // pas de clé
   // Un fichier invalide est refusé sans rien modifier
@@ -246,7 +246,7 @@ test('S10 Sauvegarde puis restauration sur une installation vierge', async ({ pa
   await p2.locator('input[type=file]').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"schemaVersion": 99, "voyages": []}') });
   await expect(p2.getByText('Version de sauvegarde inconnue', { exact: false })).toBeVisible();
   await aller(p2, 'personnes');
-  await expect(p2.locator('.personne-ligne').filter({ hasText: 'Léa' })).toHaveCount(1);
+  await expect(p2.locator('.carte-personne').filter({ hasText: 'Léa' })).toHaveCount(1);
   await ctx2.close();
 });
 
@@ -282,14 +282,14 @@ test('S11 Suggestions IA pour le groupe Collègues', async ({ page }) => {
   await configurerCle(page, false);
   for (const n of ['Aya', 'Ben']) await creerPersonne(page, n, 'Collègues');
   await aller(page, 'personnes');
-  await page.locator('.section').filter({ hasText: 'Collègues' }).getByRole('link', { name: 'Groupe' }).click();
+  await page.locator('.zone').filter({ hasText: 'Collègues' }).getByRole('link', { name: 'Idées pour le groupe' }).click();
   await page.getByRole('button', { name: 'Suggestions pour le groupe Collègues' }).click();
   await expect(page.locator('.carte-suggestion')).toHaveCount(2);
   await page.locator('.carte-suggestion').filter({ hasText: 'Momiji manjū' }).getByRole('button', { name: 'Accepter' }).click();
   await page.locator('.carte-suggestion').filter({ hasText: 'Kit Kat au matcha' }).getByRole('button', { name: 'Écarter' }).click();
   await expect(page.locator('.carte-suggestion')).toHaveCount(0);
   // L'idée acceptée est attribuée au groupe (collectif), avec ses lieux
-  await expect(page.locator('.souvenir-ligne').filter({ hasText: 'Momiji manjū' })).toBeVisible();
+  await expect(page.locator('.carte-souvenir').filter({ hasText: 'Momiji manjū' })).toBeVisible();
   await ouvrirSouvenir(page, 'Momiji manjū');
   await expect(page.locator('.attribution')).toContainText('Collègues');
   await expect(page.locator('.attribution')).toContainText('collectif');
@@ -332,4 +332,28 @@ test('S12 Mode manuel : copier la demande, coller une réponse', async ({ page, 
   await expect(feuille(page).getByRole('alert')).toContainText('Réponse invalide');
   await page.keyboard.press('Escape');
   await expect(page.locator('.carte-lieu')).toHaveCount(3);
+});
+
+test('Personnes : créer un groupe et y glisser une carte', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1800 });
+  await demarrer(page, '2026-11-02');
+  await creerPersonne(page, 'Léa', 'Amis');
+  await aller(page, 'personnes');
+  await page.getByLabel('Nom du nouveau groupe').fill('Voisins');
+  await page.getByRole('button', { name: 'Créer le groupe' }).click();
+  const zone = page.locator('section.zone[aria-label="Voisins"]');
+  await expect(zone).toContainText('Glissez des personnes ici');
+  const carte = page.locator('.carte-personne[aria-label="Léa"]');
+  const a = await carte.boundingBox();
+  const b = await zone.boundingBox();
+  await page.mouse.move(a!.x + a!.width / 2, a!.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(a!.x + a!.width / 2 + 20, a!.y + 40, { steps: 4 });
+  await page.mouse.move(b!.x + b!.width / 2, b!.y + b!.height / 2, { steps: 10 });
+  await expect(zone).toHaveClass(/zone-survol/);
+  await page.mouse.up();
+  await expect(zone.locator('.carte-personne')).toContainText('Léa');
+  await expect(page.locator('.toast')).toContainText('Léa → Voisins');
+  // Le clic qui suit le glisser n'ouvre pas la fiche
+  await expect(page.locator('main h1')).toHaveText('Personnes');
 });

@@ -1,11 +1,9 @@
-// Fiche souvenir (§7.3, F-22, F-23, F-24, F-26, F-33, F-41, F-50).
+// Fiche souvenir (§7.3, F-22 à F-26, F-33, F-41, F-50) : lecture d'abord, modification à la demande.
 import { useEffect, useState } from 'preact/hooks';
 import type { Attribution, Cible, Lieu, LieuData, Souvenir, TypeLieu } from '../../db/types';
-import { MOI_ID } from '../../db/types';
 import * as A from '../../domain/actions';
 import {
   attributionsDe,
-  estCollective,
   estPourMoi,
   etatSouvenir,
   etapesDuVoyage,
@@ -13,228 +11,422 @@ import {
   etatTicket,
   lieuxDe,
   nomCible,
+  personnesDeCible,
   prixYen,
-  unitesAttribuees,
+  unitesNonAttribuees,
 } from '../../domain/rules';
 import { formatDate, today } from '../../domain/dates';
-import { euro, lienCarte, nombre, parseNombre, yen } from '../../domain/format';
+import { euro, lienCarte, nombre, parseNombre, pluriel, yen } from '../../domain/format';
 import { agir, aller, erreur, essayer, fermer, notifier, ouvrir } from '../state';
-import { categoriesTriees, nomEtape, useDb, useJour, useVoyage } from '../data';
-import { BadgeEtat, Champ, confirmer, Interrupteur, LienExterne, Plier, Section, Selecteur, Texte, Vide, ZoneTexte } from '../components/ui';
+import { categoriesTriees, nomCategorie, nomEtape, useDb, useJour, useVoyage } from '../data';
+import { Champ, confirmer, Interrupteur, LienExterne, Plier, Selecteur, Texte, Vide, ZoneTexte } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { EtapeSelect, EtapesChoix, RetourChamps } from '../components/champs';
 import { PourQui } from '../components/PourQui';
 import { enregistrerPhoto, urlPhoto } from '../components/photo';
+import { Avancement, Avatar, Carte, PastillesRetour, Tuile, tonSouvenir, type Ton } from '../components/visuel';
 import { ouvrirSaisie, Quantite } from './Saisie';
-import { Introuvable, Retour as RetourLien, EtatJob } from './Personnes';
+import { EtatJob, Introuvable, Retour as RetourLien } from './Personnes';
 import { cleConfiguree, demander, jobPour } from '../../ai/queue';
 import { BlocManuel } from './Manuel';
 
 export function SouvenirFiche({ id }: { id: string }) {
   const db = useDb();
-  const v = useVoyage();
   const s = db.souvenirs.find((x) => x.id === id);
   if (!s) return <Introuvable />;
   const attrs = attributionsDe(db, s.id);
   const etat = etatSouvenir(s, attrs);
+  const ton = tonSouvenir(etat);
+  const autres = attrs.filter((a) => !estPourMoi(a));
+  const donnes = autres.filter((a) => a.remise === 'donne').length;
+  const cat = nomCategorie(db, s.categorieId);
   return (
-    <div class="ecran fiche">
-      <RetourLien href={s.statut === 'idee' ? 'souvenirs?seg=idees' : 'souvenirs?seg=achetes'} />
-      <div class="ecran-tete">
-        <div>
-          <h1>{s.nom}</h1>
-          <p class="discret">
-            <BadgeEtat etat={etat} />
-            {s.origine === 'ia' && <span class="puce-ia">IA</span>}
-          </p>
-        </div>
+    <div class="ecran etroit fiche">
+      <div class="barre-fiche">
+        <RetourLien href={s.statut === 'idee' ? 'souvenirs?seg=idees' : 'souvenirs?seg=achetes'} libelle="Cadeaux" />
         <div class="boutons">
-          {s.statut === 'idee' ? (
-            <button class="btn btn-primaire" onClick={() => ouvrirSaisie('achat', { ideeId: s.id })}>
-              Marquer acheté
-            </button>
-          ) : (
-            <button
-              class="btn btn-petit"
-              onClick={() =>
-                confirmer('Revenir à l’idée ?', 'Les informations d’achat (prix, boutique, détaxe) seront effacées. Les attributions sont conservées.', 'Revenir à l’idée', () =>
-                  agir((d) => A.revenirIdee(d, s.id), 'Repassé en idée'),
-                )
-              }
-            >
-              Revenir à l'idée
-            </button>
-          )}
-          <button
-            class="btn-icone"
-            aria-label="Supprimer"
-            onClick={async () => {
-              aller(s.statut === 'idee' ? 'souvenirs?seg=idees' : 'souvenirs?seg=achetes');
-              await agir((d) => A.supprimerSouvenir(d, s.id), `« ${s.nom} » supprimé`);
-            }}
-          >
-            <Icon n="corbeille" />
+          <button class="btn-icone" aria-label="Modifier" onClick={() => ouvrir('Modifier', () => <FormEssentiel s={s} />)}>
+            <Icon n="modifier" />
+          </button>
+          <button class="btn-icone" aria-label="Plus d'actions" onClick={() => ouvrir(s.nom, () => <MenuActions s={s} />)}>
+            <Icon n="plusActions" taille={24} epaisseur={3} />
           </button>
         </div>
       </div>
 
-      <Essentiel s={s} />
-      <PourQuiSection s={s} attrs={attrs} />
+      <Carte>
+        <div class="fiche-tete">
+          <Tuile s={s} ton={ton} taille={64} />
+          <div class="pile" style={{ gap: '4px', minWidth: 0 }}>
+            <h1>{s.nom}</h1>
+            <span class="discret">
+              {[cat, s.quantite > 1 ? `×${s.quantite}` : '', s.origine === 'ia' ? 'proposé par l’IA' : ''].filter(Boolean).join(' · ') || 'Sans catégorie'}
+            </span>
+          </div>
+        </div>
+        <Avancement etat={etat} donnes={donnes} total={autres.length} />
+        <PastillesRetour db={db} s={s} />
+        {s.note && <p class="discret">{s.note}</p>}
+        {s.statut === 'idee' && (
+          <button class="btn btn-primaire btn-large" onClick={() => ouvrirSaisie({ ideeId: s.id })}>
+            <Icon n="sac" taille={20} epaisseur={2} /> Je l'ai acheté
+          </button>
+        )}
+      </Carte>
+
+      <PourQuiCarte s={s} attrs={attrs} />
+      {s.statut === 'achete' && s.achat && <AchatCarte s={s} />}
       <OuAcheter s={s} />
-      {s.statut === 'achete' && s.achat && <AchatSection s={s} />}
-      <Section titre="Retour" repliable ouvert={!!(s.retour.alcool || s.retour.tranchant || s.retour.liquide)}>
-        <RetourChamps
-          valeur={s.retour}
-          achete={s.statut === 'achete'}
-          onChange={(m) => agir((d) => A.modifierRetour(d, s.id, m))}
-        />
-      </Section>
-      <Section titre="Historique" repliable ouvert={false}>
-        <ul class="liste-simple">
-          <li>Créé le {formatDate(s.createdAt.slice(0, 10))}</li>
-          {s.achat && <li>Acheté le {formatDate(s.achat.date)} à {nomEtape(db, s.achat.etapeId)}</li>}
-          {attrs
-            .filter((a) => a.remise === 'donne' && a.dateRemise)
-            .map((a) => (
+
+      <Carte>
+        <Plier titre="Contraintes de retour (alcool, bagage, douane…)" ouvert={false}>
+          <RetourChamps valeur={s.retour} achete={s.statut === 'achete'} onChange={(m) => agir((d) => A.modifierRetour(d, s.id, m))} />
+        </Plier>
+        <Plier titre="Historique">
+          <ul class="liste-simple">
+            <li>Créé le {formatDate(s.createdAt.slice(0, 10))}</li>
+            {s.achat && (
               <li>
-                Donné à {nomCible(db, a)} le {formatDate(a.dateRemise!)}
+                Acheté le {formatDate(s.achat.date)} à {nomEtape(db, s.achat.etapeId)}
               </li>
-            ))}
-        </ul>
-      </Section>
-      {v && null}
+            )}
+            {attrs
+              .filter((a) => a.remise === 'donne' && a.dateRemise)
+              .map((a) => (
+                <li>
+                  Donné à {nomCible(db, a)} le {formatDate(a.dateRemise!)}
+                </li>
+              ))}
+          </ul>
+        </Plier>
+      </Carte>
     </div>
   );
 }
 
-// ---------------------------------------------------------------- Essentiel
+function MenuActions({ s }: { s: Souvenir }) {
+  return (
+    <div class="menu-actions">
+      {s.statut === 'achete' && (
+        <button
+          onClick={() => {
+            fermer();
+            confirmer(
+              'Revenir à l’idée ?',
+              'Le prix, la boutique et la détaxe seront effacés. Les destinataires sont conservés.',
+              'Revenir à l’idée',
+              () => agir((d) => A.revenirIdee(d, s.id), 'Repassé en idée'),
+            );
+          }}
+        >
+          <Icon n="ampoule" /> Ce n'est plus qu'une idée
+        </button>
+      )}
+      <button
+        class="danger"
+        onClick={async () => {
+          fermer();
+          aller(s.statut === 'idee' ? 'souvenirs?seg=idees' : 'souvenirs?seg=achetes');
+          await agir((d) => A.supprimerSouvenir(d, s.id), `« ${s.nom} » supprimé`);
+        }}
+      >
+        <Icon n="corbeille" /> Supprimer
+      </button>
+    </div>
+  );
+}
 
-function Essentiel({ s }: { s: Souvenir }) {
+function FormEssentiel({ s }: { s: Souvenir }) {
   const db = useDb();
   const [nom, setNom] = useState(s.nom);
+  const [categorie, setCategorie] = useState(s.categorieId ?? '');
+  const [quantite, setQuantite] = useState(s.quantite);
   const [note, setNote] = useState(s.note ?? '');
-  useEffect(() => setNom(s.nom), [s.nom]);
-  useEffect(() => setNote(s.note ?? ''), [s.note]);
   return (
-    <Section titre="Essentiel">
-      <div class="pile">
-        <Champ label="Nom">
-          <Texte valeur={nom} onValeur={setNom} onBlur={() => nom.trim() !== s.nom && agir((d) => A.modifierSouvenir(d, s.id, { nom }))} />
+    <form
+      class="pile"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (await essayer((d) => A.modifierSouvenir(d, s.id, { nom, categorieId: categorie || null, quantite, note }), 'Modifié')) fermer();
+      }}
+    >
+      <Champ label="Nom">
+        <Texte valeur={nom} onValeur={setNom} required />
+      </Champ>
+      <div class="grille2">
+        <Champ label="Catégorie">
+          <Selecteur valeur={categorie} onValeur={setCategorie} vide="—" options={categoriesTriees(db).map((c) => ({ id: c.id, libelle: c.libelle }))} />
         </Champ>
-        <div class="grille2">
-          <Champ label="Catégorie">
-            <Selecteur
-              valeur={s.categorieId ?? ''}
-              onValeur={(c) => agir((d) => A.modifierSouvenir(d, s.id, { categorieId: c || null }))}
-              vide="—"
-              options={categoriesTriees(db).map((c) => ({ id: c.id, libelle: c.libelle }))}
-            />
-          </Champ>
-          <Champ groupe label="Quantité">
-            <Quantite valeur={s.quantite} onChange={(n) => agir((d) => A.modifierSouvenir(d, s.id, { quantite: n }))} />
-          </Champ>
-        </div>
-        <Champ label="Note">
-          <ZoneTexte valeur={note} onValeur={setNote} rows={2} />
+        <Champ groupe label="Quantité">
+          <Quantite valeur={quantite} onChange={setQuantite} />
         </Champ>
-        {note !== (s.note ?? '') && (
-          <button class="btn btn-petit" onClick={() => agir((d) => A.modifierSouvenir(d, s.id, { note }))}>
-            Enregistrer la note
-          </button>
-        )}
       </div>
-    </Section>
+      <Champ label="Note">
+        <ZoneTexte valeur={note} onValeur={setNote} rows={3} />
+      </Champ>
+      <button type="submit" class="btn btn-primaire btn-large">
+        Enregistrer
+      </button>
+    </form>
   );
 }
 
 // ---------------------------------------------------------------- Pour qui (F-23)
 
-function PourQuiSection({ s, attrs }: { s: Souvenir; attrs: Attribution[] }) {
+function tonAttribution(s: Souvenir, a: Attribution): Ton {
+  if (s.statut === 'idee') return 'idee';
+  return a.remise === 'donne' ? 'donne' : 'achete';
+}
+
+function PourQuiCarte({ s, attrs }: { s: Souvenir; attrs: Attribution[] }) {
   const db = useDb();
-  const k = unitesAttribuees(attrs);
+  const libres = unitesNonAttribuees(s, attrs);
   return (
-    <Section
-      titre={`Pour qui · ${k}/${s.quantite} attribués`}
+    <Carte
+      titre="Pour qui ?"
       action={
-        <button class="btn btn-petit" onClick={() => ouvrir('Attribuer', () => <FormAttribution s={s} />)}>
-          <Icon n="plus" taille={16} /> Attribuer
+        <button class="btn btn-petit" onClick={() => ouvrir('Pour qui ?', () => <GererPourQui s={s} />)}>
+          {attrs.length ? 'Changer' : 'Choisir'}
         </button>
       }
     >
-      {attrs.length === 0 ? (
-        <Vide>Personne pour l'instant.</Vide>
-      ) : (
+      {attrs.length === 0 && <p class="vide">Personne pour l'instant.</p>}
+      <div>
+        {attrs.map((a) => {
+          const moi = estPourMoi(a);
+          const ids = a.cible.type === 'personnes' ? a.cible.ids : [];
+          const seule = ids.length === 1 ? db.personnes.find((p) => p.id === ids[0]) : undefined;
+          const t = tonAttribution(s, a);
+          return (
+            <div class="pour-ligne attribution">
+              {seule ? (
+                <Avatar personne={seule} ton={moi ? undefined : t} taille={44} />
+              ) : (
+                <span class={`avatar anneau-${t}`} style={{ width: '44px', height: '44px', background: 'var(--fond-3)' }} aria-hidden="true">
+                  <Icon n="groupe" taille={20} />
+                </span>
+              )}
+              <span class="nom">
+                {moi ? 'Moi' : nomCible(db, a)}
+                {a.quantite > 1 && <span class="discret"> ×{a.quantite}</span>}
+                {a.cible.type === 'groupe' || ids.length > 1 ? (
+                  <span class="discret petite" style={{ display: 'block', fontWeight: 400 }}>
+                    Cadeau collectif · {pluriel(personnesDeCible(db, a).length, 'personne')}
+                  </span>
+                ) : null}
+              </span>
+              {s.statut === 'achete' && !moi &&
+                (a.remise === 'donne' ? (
+                  <button class="btn btn-petit btn-donne fait" onClick={() => agir((d) => A.annulerRemise(d, a.id), 'Remise annulée')}>
+                    <Icon n="ok" taille={16} epaisseur={2.4} /> Donné
+                  </button>
+                ) : (
+                  <button class="btn btn-petit btn-donne" onClick={() => agir((d) => A.donner(d, a.id, today()), 'Marqué donné')}>
+                    Donné
+                  </button>
+                ))}
+            </div>
+          );
+        })}
+      </div>
+      {s.statut === 'achete' && libres > 0 && (
+        <p class="avert">
+          {libres === 1 ? '1 exemplaire n’a pas encore de destinataire.' : `${libres} exemplaires n’ont pas encore de destinataire.`}{' '}
+          <button class="lien" onClick={() => ouvrir('Pour qui ?', () => <FormAttribution s={s} />)}>
+            Choisir
+          </button>
+        </p>
+      )}
+    </Carte>
+  );
+}
+
+function GererPourQui({ s }: { s: Souvenir }) {
+  const db = useDb();
+  const cur = db.souvenirs.find((x) => x.id === s.id) ?? s;
+  const attrs = attributionsDe(db, s.id);
+  return (
+    <div class="pile">
+      {attrs.length > 0 && (
         <ul class="liste">
           {attrs.map((a) => (
-            <li class="attribution">
-              <div class="attribution-tete">
-                <span>
-                  <strong>{estPourMoi(a) ? 'Moi' : nomCible(db, a)}</strong>
-                  {estCollective(a) && <span class="puce puce-collectif">collectif</span>}
-                </span>
+            <li class="ligne-rangement">
+              <strong>{estPourMoi(a) ? 'Moi' : nomCible(db, a)}</strong>
+              <span class="boutons">
                 <Quantite valeur={a.quantite} onChange={(n) => agir((d) => A.modifierAttribution(d, a.id, { quantite: n }))} />
-              </div>
-              <div class="ligne-actions">
-                {s.statut === 'achete' && !estPourMoi(a) &&
-                  (a.remise === 'donne' ? (
-                    <>
-                      <span class="badge badge-donne">✓ Donné le {formatDate(a.dateRemise!)}</span>
-                      <button class="btn btn-petit" onClick={() => agir((d) => A.annulerRemise(d, a.id), 'Remise annulée')}>
-                        Annuler
-                      </button>
-                    </>
-                  ) : (
-                    <button class="btn btn-petit btn-primaire" onClick={() => agir((d) => A.donner(d, a.id, today()), 'Marqué donné')}>
-                      Donné
-                    </button>
-                  ))}
-                <button class="btn btn-petit" onClick={() => ouvrir('Modifier l’attribution', () => <FormAttribution s={s} attribution={a} />)}>
-                  Modifier
-                </button>
-                <button class="btn btn-petit" onClick={() => agir((d) => A.supprimerAttribution(d, a.id), 'Attribution retirée')}>
+                <button class="btn btn-petit" onClick={() => agir((d) => A.supprimerAttribution(d, a.id), 'Retiré')}>
                   Retirer
                 </button>
-              </div>
+              </span>
             </li>
           ))}
         </ul>
       )}
-    </Section>
+      {cur.quantite > 1 && (
+        <p class="discret">
+          {cur.quantite} exemplaires · {unitesNonAttribuees(cur, attrs)} sans destinataire
+        </p>
+      )}
+      <h3 class="sous-titre">Ajouter</h3>
+      <FormAttribution s={cur} />
+    </div>
   );
 }
 
-function FormAttribution({ s, attribution }: { s: Souvenir; attribution?: Attribution }) {
-  const init: A.SelectionCibles = !attribution
-    ? { personnes: [], groupes: [], moi: false }
-    : attribution.cible.type === 'groupe'
-      ? { personnes: [], groupes: [attribution.cible.groupeId], moi: false }
-      : estPourMoi(attribution)
-        ? { personnes: [], groupes: [], moi: true }
-        : { personnes: attribution.cible.ids, groupes: [], moi: false, commun: attribution.cible.ids.length > 1 };
-  const [sel, setSel] = useState<A.SelectionCibles>(init);
-  const [quantite, setQuantite] = useState(attribution?.quantite ?? 1);
+function FormAttribution({ s }: { s: Souvenir }) {
+  const [sel, setSel] = useState<A.SelectionCibles>({ personnes: [], groupes: [], moi: false });
   const enregistrer = async () => {
     const cibles = A.ciblesDeSelection(sel);
-    if (!cibles.length) return erreur(new A.ErreurMetier('Choisissez au moins un destinataire.'));
+    if (!cibles.length) return erreur(new A.ErreurMetier('Choisissez au moins une personne.'));
     const ok = await essayer((d) => {
-      if (attribution) {
-        if (cibles.length !== 1) throw new A.ErreurMetier('Une attribution vise une seule cible (cochez « cadeau commun » pour plusieurs personnes).');
-        A.modifierAttribution(d, attribution.id, { cible: cibles[0] as Cible, quantite });
-      } else for (const c of cibles) A.ajouterAttribution(d, s.id, c, quantite, s.statut === 'idee');
-    }, attribution ? 'Attribution modifiée' : 'Attribué');
+      for (const c of cibles) A.ajouterAttribution(d, s.id, c as Cible, 1, s.statut === 'idee');
+    }, 'Ajouté');
     if (ok) fermer();
   };
   return (
     <div class="pile">
       <PourQui valeur={sel} onChange={setSel} />
-      <Champ groupe label="Unités par attribution">
-        <Quantite valeur={quantite} onChange={setQuantite} />
-      </Champ>
-      {s.statut === 'achete' && <p class="champ-aide">Lot de {s.quantite} : la somme des unités attribuées ne peut pas dépasser la quantité.</p>}
+      {s.statut === 'achete' && <p class="champ-aide">Un exemplaire par personne choisie ; il faut assez d'exemplaires (quantité) pour tout le monde.</p>}
       <button class="btn btn-primaire btn-large" onClick={enregistrer}>
-        Enregistrer
+        Ajouter
       </button>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- Achat (F-24, F-26, F-50)
+
+function AchatCarte({ s }: { s: Souvenir }) {
+  const db = useDb();
+  const v = useVoyage();
+  const a = s.achat!;
+  const [photo, setPhoto] = useState<string | undefined>();
+  useEffect(() => {
+    let vivant = true;
+    if (s.photoId) void urlPhoto(s.photoId).then((u) => vivant && setPhoto(u));
+    else setPhoto(undefined);
+    return () => {
+      vivant = false;
+    };
+  }, [s.photoId]);
+  const ticket = a.ticketDetaxeId ? db.tickets.find((t) => t.id === a.ticketDetaxeId) : undefined;
+  const et = ticket ? etatTicket(db, ticket, v) : undefined;
+  const choisirPhoto = async (e: Event) => {
+    const f = (e.target as HTMLInputElement).files?.[0];
+    if (!f) return;
+    try {
+      const id = await enregistrerPhoto(f);
+      await agir((d) => A.modifierSouvenir(d, s.id, { photoId: id }), 'Photo enregistrée');
+    } catch (err) {
+      erreur(err);
+    }
+  };
+  return (
+    <Carte
+      titre="Acheté"
+      action={
+        <button class="btn btn-petit" onClick={() => ouvrir('Modifier l’achat', () => <FormAchat s={s} />)}>
+          Modifier
+        </button>
+      }
+    >
+      <div class="prix-grand">
+        <strong>{a.devise === 'JPY' ? yen(a.prix) : euro(a.prix)}</strong>
+        <span class="discret">{a.devise === 'JPY' ? euro(a.prixEUR) : yen(prixYen(s))}</span>
+      </div>
+      <dl class="infos">
+        <div>
+          <dt>Quand</dt>
+          <dd>{formatDate(a.date)}</dd>
+        </div>
+        <div>
+          <dt>Où</dt>
+          <dd>
+            {nomEtape(db, a.etapeId)}
+            {a.boutique ? ` · ${a.boutique}` : ''}
+          </dd>
+        </div>
+      </dl>
+      {photo ? (
+        <>
+          <img src={photo} alt={`Photo de ${s.nom}`} class="photo" />
+          <div class="boutons">
+            <label class="btn btn-petit">
+              <Icon n="photo" taille={16} /> Remplacer
+              <input type="file" accept="image/*" class="masque" onChange={choisirPhoto} />
+            </label>
+            <button class="btn btn-petit" onClick={() => agir((d) => A.modifierSouvenir(d, s.id, { photoId: null }), 'Photo supprimée')}>
+              Supprimer la photo
+            </button>
+          </div>
+        </>
+      ) : (
+        <label class="ajout-photo">
+          <Icon n="photo" taille={20} /> Ajouter une photo
+          <input type="file" accept="image/*" class="masque" onChange={choisirPhoto} />
+        </label>
+      )}
+      {v.detaxeActive && (
+        <Interrupteur
+          label="Détaxé"
+          aide={ticket ? `Ticket ${ticket.boutique} du ${formatDate(ticket.date)}` : 'Rejoint le ticket de sa boutique et de sa date'}
+          checked={!!a.ticketDetaxeId}
+          onChange={(c) => agir((d) => A.definirDetaxe(d, s.id, c))}
+        />
+      )}
+      {et && (
+        <p class={et.eligible ? 'discret' : 'avert'}>
+          Ticket : {yen(et.totalTTC)} TTC · {yen(et.totalHT)} HT · {et.eligible ? `taxe ${yen(et.taxe)}` : 'sous le seuil de 5 000 ¥ HT'}
+          {et.compromis.length > 0 && <span class="alerte-texte"> · Ticket compromis</span>}
+        </p>
+      )}
+    </Carte>
+  );
+}
+
+function FormAchat({ s }: { s: Souvenir }) {
+  const a = s.achat!;
+  const [date, setDate] = useState(a.date);
+  const [etapeId, setEtapeId] = useState(a.etapeId);
+  const [boutique, setBoutique] = useState(a.boutique ?? '');
+  const [prix, setPrix] = useState(String(a.prix).replace('.', ','));
+  const [taux, setTaux] = useState(String(a.tauxEUR).replace('.', ','));
+  return (
+    <form
+      class="pile"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const p = parseNombre(prix);
+        const t = parseNombre(taux);
+        if (await essayer((d) => A.modifierAchat(d, s.id, { date, etapeId, boutique, prix: p, tauxEUR: t }), 'Achat modifié')) fermer();
+      }}
+    >
+      <div class="grille2">
+        <Champ label="Date">
+          <input type="date" value={date} onInput={(e) => setDate((e.target as HTMLInputElement).value || date)} />
+        </Champ>
+        <Champ label="Étape">
+          <EtapeSelect valeur={etapeId} onValeur={setEtapeId} />
+        </Champ>
+      </div>
+      <Champ label="Boutique">
+        <Texte valeur={boutique} onValeur={setBoutique} />
+      </Champ>
+      <div class="grille2">
+        <Champ label={`Prix (${a.devise === 'JPY' ? '¥' : '€'})`}>
+          <input type="text" inputMode="decimal" value={prix} onInput={(e) => setPrix((e.target as HTMLInputElement).value)} />
+        </Champ>
+        <Champ label="Taux figé (€ pour 1 ¥)">
+          <input type="text" inputMode="decimal" value={taux} onInput={(e) => setTaux((e.target as HTMLInputElement).value)} />
+        </Champ>
+      </div>
+      <p class="champ-aide">
+        Taux figé le {formatDate((a.enregistreLe ?? a.date).slice(0, 10))} : {nombre(a.tauxEUR, 6)} € pour 1 ¥. Changer le taux du jour ne modifie pas cet achat.
+      </p>
+      <button type="submit" class="btn btn-primaire btn-large">
+        Enregistrer
+      </button>
+    </form>
   );
 }
 
@@ -265,14 +457,14 @@ function OuAcheter({ s }: { s: Souvenir }) {
   const chercher = async () => {
     try {
       await demander([{ type: 'lieux', souvenirId: s.id }]);
-      notifier('Recherche en file');
+      notifier('Recherche lancée');
     } catch (e) {
       erreur(e);
     }
   };
   return (
-    <Section
-      titre="Où l'acheter"
+    <Carte
+      titre={s.statut === 'idee' ? "Où l'acheter" : 'Adresses'}
       action={
         <button class="btn btn-petit" onClick={() => ouvrir('Ajouter un lieu', () => <FormLieu s={s} />)}>
           <Icon n="plus" taille={16} /> Ajouter un lieu
@@ -282,7 +474,7 @@ function OuAcheter({ s }: { s: Souvenir }) {
       {s.statut === 'idee' && (
         <div class="boutons">
           {cleConfiguree.value && (
-            <button class="btn" onClick={chercher} disabled={job?.statut === 'file' || job?.statut === 'en_cours'}>
+            <button class="btn btn-contour" onClick={chercher} disabled={job?.statut === 'file' || job?.statut === 'en_cours'}>
               <Icon n="ia" taille={16} /> Chercher avec l'IA
             </button>
           )}
@@ -294,7 +486,7 @@ function OuAcheter({ s }: { s: Souvenir }) {
       {job && job.statut !== 'terminee' && <EtatJob statut={job.statut} erreur={job.erreur} />}
       {obsoletes && (
         <p class="avert">
-          L'idée a été renommée après la recherche : lieux IA peut-être obsolètes.{' '}
+          L'idée a été renommée après la recherche : ces lieux sont peut-être obsolètes.{' '}
           {cleConfiguree.value && (
             <button class="lien" onClick={chercher}>
               Relancer
@@ -314,7 +506,7 @@ function OuAcheter({ s }: { s: Souvenir }) {
           {s.ia.derniereChance && <p class="discret">Seulement à : {nomEtape(db, s.ia.derniereChance)}</p>}
         </div>
       )}
-      {actifs.length === 0 ? <Vide>Aucun lieu d'achat.</Vide> : <ul class="liste">{actifs.map((l) => <CarteLieu l={l} s={s} />)}</ul>}
+      {actifs.length === 0 ? <Vide>Aucune adresse pour l'instant.</Vide> : <ul class="liste">{actifs.map((l) => <CarteLieu l={l} s={s} />)}</ul>}
       {ecartes.length > 0 && (
         <Plier titre={`Lieux écartés (${ecartes.length})`}>
           <ul class="liste">
@@ -325,26 +517,26 @@ function OuAcheter({ s }: { s: Souvenir }) {
         </Plier>
       )}
       {s.statut === 'idee' && (
-        <div class="pile">
-          <Champ groupe label="Étapes prévues">
-            <EtapesChoix valeur={s.etapesPrevues} onChange={(ids) => agir((d) => A.modifierSouvenir(d, s.id, { etapesPrevues: ids }))} />
-          </Champ>
+        <Plier titre="Étapes prévues">
+          <EtapesChoix valeur={s.etapesPrevues} onChange={(ids) => agir((d) => A.modifierSouvenir(d, s.id, { etapesPrevues: ids }))} />
           <Interrupteur
             label="Partout"
             aide="Trouvable à toutes les étapes (konbini…)"
             checked={!!s.partout}
             onChange={(c) => agir((d) => A.modifierSouvenir(d, s.id, { partout: c }))}
           />
-          <p class="discret">
-            {s.partout
-              ? 'Achetable à toutes les étapes restantes.'
-              : restantes.length
-                ? `Dernière étape possible : ${restantes[restantes.length - 1].ville}`
-                : 'Aucune étape restante prévue.'}
-          </p>
-        </div>
+        </Plier>
       )}
-    </Section>
+      {s.statut === 'idee' && (
+        <p class="discret">
+          {s.partout
+            ? 'Achetable à toutes les étapes restantes.'
+            : restantes.length
+              ? `Dernière étape possible : ${restantes[restantes.length - 1].ville}`
+              : 'Aucune étape restante prévue.'}
+        </p>
+      )}
+    </Carte>
   );
 }
 
@@ -353,22 +545,21 @@ function CarteLieu({ l, s }: { l: Lieu; s: Souvenir }) {
   const villes = l.etapeIds.map((e) => nomEtape(db, e));
   return (
     <li class={'carte-lieu' + (l.ecarte ? ' ecarte' : '')}>
-      <div class="carte-lieu-tete">
-        <strong>{l.nom}</strong>
+      <div class="lieu-ligne">
+        <div>
+          <strong>{l.nom}</strong>
+          <span>
+            {TYPES_LIEU.find((t) => t.id === l.type)?.libelle} · {villes.join(', ')}
+            {l.zone ? ` · ${l.zone}` : ''}
+            {l.prixMinYen !== undefined || l.prixMaxYen !== undefined
+              ? ` · ${l.prixMinYen !== undefined ? yen(l.prixMinYen) : '?'}${l.prixMaxYen !== undefined && l.prixMaxYen !== l.prixMinYen ? ` – ${yen(l.prixMaxYen)}` : ''}`
+              : ''}
+          </span>
+        </div>
         <a class="btn-icone" href={lienCarte(l.nom, villes[0] ?? '')} target="_blank" rel="noopener noreferrer" aria-label={`Ouvrir ${l.nom} dans Google Maps`}>
-          <Icon n="carte" taille={18} />
+          <Icon n="carte" taille={20} />
         </a>
       </div>
-      <p class="discret">
-        {TYPES_LIEU.find((t) => t.id === l.type)?.libelle} · {villes.join(', ')}
-        {l.zone ? ` · ${l.zone}` : ''}
-      </p>
-      {(l.prixMinYen !== undefined || l.prixMaxYen !== undefined) && (
-        <p class="petite">
-          {l.prixMinYen !== undefined ? yen(l.prixMinYen) : '?'}
-          {l.prixMaxYen !== undefined && l.prixMaxYen !== l.prixMinYen ? ` – ${yen(l.prixMaxYen)}` : ''}
-        </p>
-      )}
       {l.horaires && <p class="petite">Horaires : {l.horaires}</p>}
       {l.conseil && <p class="petite">{l.conseil}</p>}
       {l.origine === 'ia' && (
@@ -386,10 +577,7 @@ function CarteLieu({ l, s }: { l: Lieu; s: Souvenir }) {
       )}
       <div class="ligne-actions">
         {s.statut === 'achete' && s.achat && s.achat.lieuId !== l.id && (
-          <button
-            class="btn btn-petit"
-            onClick={() => agir((d) => A.modifierAchat(d, s.id, { lieuId: l.id, boutique: l.nom, etapeId: l.etapeIds[0] }), 'Boutique renseignée')}
-          >
+          <button class="btn btn-petit" onClick={() => agir((d) => A.modifierAchat(d, s.id, { lieuId: l.id, boutique: l.nom, etapeId: l.etapeIds[0] }), 'Boutique renseignée')}>
             Acheté ici
           </button>
         )}
@@ -479,118 +667,3 @@ function FormLieu({ s, lieu }: { s: Souvenir; lieu?: Lieu }) {
     </form>
   );
 }
-
-// ---------------------------------------------------------------- Achat (F-24, F-26, F-50)
-
-function AchatSection({ s }: { s: Souvenir }) {
-  const db = useDb();
-  const v = useVoyage();
-  const a = s.achat!;
-  const [boutique, setBoutique] = useState(a.boutique ?? '');
-  const [prix, setPrix] = useState(String(a.prix).replace('.', ','));
-  const [taux, setTaux] = useState(String(a.tauxEUR).replace('.', ','));
-  const [photo, setPhoto] = useState<string | undefined>();
-  useEffect(() => setBoutique(a.boutique ?? ''), [a.boutique]);
-  useEffect(() => setPrix(String(a.prix).replace('.', ',')), [a.prix]);
-  useEffect(() => setTaux(String(a.tauxEUR).replace('.', ',')), [a.tauxEUR]);
-  useEffect(() => {
-    let vivant = true;
-    if (s.photoId) void urlPhoto(s.photoId).then((u) => vivant && setPhoto(u));
-    else setPhoto(undefined);
-    return () => {
-      vivant = false;
-    };
-  }, [s.photoId]);
-  const ticket = a.ticketDetaxeId ? db.tickets.find((t) => t.id === a.ticketDetaxeId) : undefined;
-  const et = ticket ? etatTicket(db, ticket, v) : undefined;
-  return (
-    <Section titre="Achat">
-      <div class="pile">
-        <div class="grille2">
-          <Champ label="Date">
-            <input type="date" value={a.date} onChange={(e) => agir((d) => A.modifierAchat(d, s.id, { date: (e.target as HTMLInputElement).value || a.date }))} />
-          </Champ>
-          <Champ label="Étape">
-            <EtapeSelect valeur={a.etapeId} onValeur={(id) => agir((d) => A.modifierAchat(d, s.id, { etapeId: id }))} />
-          </Champ>
-        </div>
-        <Champ label="Boutique">
-          <Texte valeur={boutique} onValeur={setBoutique} onBlur={() => boutique !== (a.boutique ?? '') && agir((d) => A.modifierAchat(d, s.id, { boutique }))} />
-        </Champ>
-        <div class="grille2">
-          <Champ label={`Prix (${a.devise === 'JPY' ? '¥' : '€'})`} aide={a.devise === 'JPY' ? euro(a.prixEUR) : yen(prixYen(s))}>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={prix}
-              onInput={(e) => setPrix((e.target as HTMLInputElement).value)}
-              onBlur={() => {
-                const n = parseNombre(prix);
-                if (Number.isFinite(n) && n !== a.prix) void agir((d) => A.modifierAchat(d, s.id, { prix: n }));
-              }}
-            />
-          </Champ>
-          <Champ label="Taux figé (EUR pour 1 ¥)">
-            <input
-              type="text"
-              inputMode="decimal"
-              value={taux}
-              onInput={(e) => setTaux((e.target as HTMLInputElement).value)}
-              onBlur={() => {
-                const n = parseNombre(taux);
-                if (n > 0 && n !== a.tauxEUR) void agir((d) => A.modifierAchat(d, s.id, { tauxEUR: n }));
-              }}
-            />
-          </Champ>
-        </div>
-        <Champ groupe label="Photo">
-          {photo && <img src={photo} alt={`Photo de ${s.nom}`} class="photo" />}
-          <div class="boutons">
-            <label class="btn btn-petit">
-              <Icon n="photo" taille={16} /> {s.photoId ? 'Remplacer' : 'Ajouter'}
-              <input
-                type="file"
-                accept="image/*"
-                class="masque"
-                onChange={async (e) => {
-                  const f = (e.target as HTMLInputElement).files?.[0];
-                  if (!f) return;
-                  try {
-                    const id = await enregistrerPhoto(f);
-                    await agir((d) => A.modifierSouvenir(d, s.id, { photoId: id }), 'Photo enregistrée');
-                  } catch (err) {
-                    erreur(err);
-                  }
-                }}
-              />
-            </label>
-            {s.photoId && (
-              <button class="btn btn-petit" onClick={() => agir((d) => A.modifierSouvenir(d, s.id, { photoId: null }), 'Photo supprimée')}>
-                Supprimer la photo
-              </button>
-            )}
-          </div>
-        </Champ>
-        {v.detaxeActive && (
-          <Interrupteur
-            label="Détaxé"
-            aide={ticket ? `Ticket ${ticket.boutique} du ${formatDate(ticket.date)}` : 'Rejoint le ticket de sa boutique et de sa date'}
-            checked={!!a.ticketDetaxeId}
-            onChange={(c) => agir((d) => A.definirDetaxe(d, s.id, c))}
-          />
-        )}
-        {et && (
-          <p class={et.eligible ? 'discret' : 'avert'}>
-            Ticket : {yen(et.totalTTC)} TTC · {yen(et.totalHT)} HT · {et.eligible ? `taxe ${yen(et.taxe)}` : 'sous le seuil de 5 000 ¥ HT'}
-            {et.compromis.length > 0 && <span class="alerte-texte"> · Ticket compromis</span>}
-          </p>
-        )}
-        <p class="discret petite">
-          {nombre(a.tauxEUR, 6)} € / ¥ figé le {formatDate((a.enregistreLe ?? a.date).slice(0, 10))}
-        </p>
-      </div>
-    </Section>
-  );
-}
-
-export { MOI_ID };

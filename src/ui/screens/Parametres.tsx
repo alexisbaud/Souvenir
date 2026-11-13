@@ -47,11 +47,11 @@ export function Parametres() {
   }
   if (!r)
     return (
-      <div class="ecran">
+      <div class="ecran etroit">
         <div class="ecran-tete">
           <h1>Paramètres</h1>
         </div>
-        <ul class="liste">
+        <ul class="liste carte">
           {RUBRIQUES.map(([id, l]) => (
             <li>
               <a class="ligne-lien" href={'#/parametres/' + id}>
@@ -65,8 +65,8 @@ export function Parametres() {
     );
   const titre = RUBRIQUES.find(([id]) => id === r)?.[1] ?? '';
   return (
-    <div class="ecran">
-      <RetourLien href="parametres" />
+    <div class="ecran etroit">
+      <RetourLien href="parametres" libelle="Paramètres" />
       <div class="ecran-tete">
         <h1>{titre}</h1>
       </div>
@@ -241,7 +241,7 @@ function Groupes() {
   const [nom, setNom] = useState('');
   const groupes = groupesTries(db);
   return (
-    <>
+    <section class="carte">
       <form
         class="ligne-form"
         onSubmit={async (e) => {
@@ -272,7 +272,7 @@ function Groupes() {
           </li>
         ))}
       </ul>
-    </>
+    </section>
   );
 }
 
@@ -296,7 +296,7 @@ function Categories() {
   const db = useDb();
   const [nom, setNom] = useState('');
   return (
-    <>
+    <section class="carte">
       <form
         class="ligne-form"
         onSubmit={async (e) => {
@@ -319,7 +319,7 @@ function Categories() {
           </li>
         ))}
       </ul>
-    </>
+    </section>
   );
 }
 
@@ -396,7 +396,7 @@ function DetaxeParams() {
   const [r, setR] = useState(String(p.tauxReduit));
   return (
     <form
-      class="pile"
+      class="pile carte"
       onSubmit={(e) => {
         e.preventDefault();
         const a = parseNombre(n);
@@ -761,7 +761,7 @@ function APropos() {
     void navigator.storage?.persisted?.().then(setPersistant);
   }, []);
   return (
-    <ul class="liste-simple">
+    <ul class="liste-simple carte" style={{ paddingLeft: '2rem' }}>
       <li>Omiyage {__APP_VERSION__} ({__BUILD_DATE__})</li>
       <li>Stockage : {stockage}</li>
       <li>Stockage persistant : {persistant === null ? '…' : persistant ? 'accordé' : 'non accordé (installez l’app sur l’écran d’accueil)'}</li>

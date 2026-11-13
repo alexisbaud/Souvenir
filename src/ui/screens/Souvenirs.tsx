@@ -12,12 +12,12 @@ import {
   souvenirsDuVoyage,
   unitesNonAttribuees,
 } from '../../domain/rules';
-import { normaliser } from '../../domain/format';
+import { normaliser, pluriel } from '../../domain/format';
 import { route } from '../state';
 import { categoriesTriees, useDb, useVoyage } from '../data';
-import { Segments, Selecteur, Vide } from '../components/ui';
+import { Selecteur, Vide } from '../components/ui';
 import { Icon } from '../components/Icon';
-import { SouvenirLigne } from '../components/SouvenirLigne';
+import { CarteSouvenir } from '../components/CarteSouvenir';
 import { libelleEtape } from '../components/champs';
 
 export type Segment = 'idees' | 'achetes' | 'a_attribuer' | 'donnes' | 'pour_moi';
@@ -96,37 +96,49 @@ export function Souvenirs() {
   });
   const nbFiltres = Object.values(f).filter(Boolean).length;
   const etapes = etapesDuVoyage(db, v.id);
+  const SEGMENTS: [Segment, string][] = [
+    ['idees', 'À acheter'],
+    ['achetes', 'Achetés'],
+    ['a_attribuer', 'Sans destinataire'],
+    ['donnes', 'Donnés'],
+    ['pour_moi', 'Pour moi'],
+  ];
 
   return (
     <div class="ecran">
       <div class="ecran-tete">
-        <h1>Souvenirs</h1>
+        <div>
+          <h1>Cadeaux</h1>
+          <p class="sous-ligne">
+            {pluriel(compte('idees'), 'idée', 'idées')} · {pluriel(tous.filter((s) => s.statut === 'achete').length, 'achat')}
+          </p>
+        </div>
+        <a class="btn" href="#/journal">
+          <Icon n="journal" taille={18} /> Journal des achats
+        </a>
       </div>
-      <Segments
-        label="Segments"
-        valeur={seg}
-        onChange={setSeg}
-        valeurs={[
-          { id: 'idees', libelle: <>Idées <small>{compte('idees')}</small></> },
-          { id: 'achetes', libelle: <>Achetés <small>{compte('achetes')}</small></> },
-          { id: 'a_attribuer', libelle: <>À attribuer <small>{compte('a_attribuer')}</small></> },
-          { id: 'donnes', libelle: <>Donnés <small>{compte('donnes')}</small></> },
-          { id: 'pour_moi', libelle: <>Pour moi <small>{compte('pour_moi')}</small></> },
-        ]}
-      />
+      <div class="segments" role="tablist" aria-label="Segments">
+        {SEGMENTS.map(([id, lib]) => (
+          <button role="tab" aria-selected={seg === id} class={'segment' + (seg === id ? ' actif' : '')} onClick={() => setSeg(id)}>
+            {lib} <small>{compte(id)}</small>
+          </button>
+        ))}
+      </div>
       <div class="barre-recherche">
         <div class="recherche">
           <Icon n="recherche" taille={18} />
-          <input type="search" placeholder="Nom, note, boutique, destinataire" aria-label="Rechercher un souvenir" value={recherche} onInput={(e) => setRecherche((e.target as HTMLInputElement).value)} />
+          <input type="search" placeholder="Nom, note, boutique, personne" aria-label="Rechercher un souvenir" value={recherche} onInput={(e) => setRecherche((e.target as HTMLInputElement).value)} />
         </div>
-        <button class={'btn btn-petit' + (nbFiltres ? ' btn-actif' : '')} aria-expanded={filtresOuverts} onClick={() => setFiltresOuverts(!filtresOuverts)}>
+        <button class={'btn' + (nbFiltres ? ' btn-actif' : '')} aria-expanded={filtresOuverts} onClick={() => setFiltresOuverts(!filtresOuverts)}>
           Filtres{nbFiltres ? ` (${nbFiltres})` : ''}
         </button>
       </div>
       {filtresOuverts && (
         <div class="filtres">
-          <Selecteur valeur={f.categorie} onValeur={(c) => setF({ ...f, categorie: c })} vide="Toutes catégories" options={categoriesTriees(db).map((c) => ({ id: c.id, libelle: c.libelle }))} />
-          <Selecteur valeur={f.etape} onValeur={(e) => setF({ ...f, etape: e })} vide="Toutes étapes" options={etapes.map((e) => ({ id: e.id, libelle: libelleEtape(e, etapes) }))} />
+          <div class="grille2">
+            <Selecteur valeur={f.categorie} onValeur={(c) => setF({ ...f, categorie: c })} vide="Toutes catégories" options={categoriesTriees(db).map((c) => ({ id: c.id, libelle: c.libelle }))} />
+            <Selecteur valeur={f.etape} onValeur={(e) => setF({ ...f, etape: e })} vide="Toutes étapes" options={etapes.map((e) => ({ id: e.id, libelle: libelleEtape(e, etapes) }))} />
+          </div>
           <div class="puces">
             <button class={'puce puce-btn' + (f.sansLieu ? ' actif' : '')} aria-pressed={f.sansLieu} onClick={() => setF({ ...f, sansLieu: !f.sansLieu })}>
               Sans lieu d'achat
@@ -139,18 +151,18 @@ export function Souvenirs() {
             </button>
           </div>
           {nbFiltres > 0 && (
-            <button class="btn btn-petit" onClick={() => setF(AUCUN)}>
+            <button class="btn btn-petit" style={{ alignSelf: 'flex-start' }} onClick={() => setF(AUCUN)}>
               Réinitialiser les filtres
             </button>
           )}
         </div>
       )}
       {liste.length === 0 ? (
-        <Vide>Aucun souvenir ici.</Vide>
+        <Vide>Rien ici pour l'instant.</Vide>
       ) : (
-        <ul class="liste" aria-label="Souvenirs">
+        <ul class="cartes-souvenirs" aria-label="Souvenirs">
           {liste.map((s) => (
-            <SouvenirLigne db={db} s={s} attrs={idx.get(s.id) ?? []} etat={seg === 'pour_moi' || seg === 'achetes'} />
+            <CarteSouvenir db={db} s={s} attrs={idx.get(s.id) ?? []} />
           ))}
         </ul>
       )}

@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { onglet, ouvrir, route } from './state';
+import { onglet, route } from './state';
 import { useDb, useVoyage } from './data';
 import { Feuilles, ToastView } from './components/ui';
 import { Icon } from './components/Icon';
@@ -10,18 +10,37 @@ import { SouvenirFiche } from './screens/SouvenirFiche';
 import { Journal } from './screens/Journal';
 import { Retour } from './screens/Retour';
 import { Parametres } from './screens/Parametres';
-import { ChoixSaisie } from './screens/Saisie';
+import { ouvrirSaisie } from './screens/Saisie';
+import { glisse } from './glisser';
+import { Avatar } from './components/visuel';
 import { rappelSauvegarde } from '../db/backup';
 import { commit } from '../db/store';
 import { now } from '../domain/dates';
 
 const ONGLETS: [string, string, string][] = [
   ['ici', 'Ici', 'ici'],
+  ['souvenirs', 'Cadeaux', 'souvenirs'],
   ['personnes', 'Personnes', 'personnes'],
-  ['souvenirs', 'Souvenirs', 'souvenirs'],
-  ['journal', 'Journal', 'journal'],
   ['retour', 'Retour', 'retour'],
 ];
+
+function ongletActif(o: string, id: string): boolean {
+  if (id === 'personnes') return o === 'personnes' || o === 'groupes';
+  if (id === 'souvenirs') return o === 'souvenirs' || o === 'journal';
+  return o === id;
+}
+
+/** Étiquette qui suit le doigt ou la souris pendant un glisser-déposer */
+function Fantome() {
+  const g = glisse.value;
+  if (!g) return null;
+  return (
+    <div class="fantome" style={{ left: `${g.x}px`, top: `${g.y}px` }} aria-hidden="true">
+      <Avatar personne={{ id: g.id, nom: g.nom }} taille={30} />
+      {g.nom}
+    </div>
+  );
+}
 
 function Ecran() {
   const [a, b] = route.value.chemin;
@@ -94,7 +113,7 @@ function RappelSauvegarde() {
 export function App() {
   const v = useVoyage();
   const o = onglet.value;
-  const fab = ['ici', 'personnes', 'souvenirs', 'journal'].includes(o) && !route.value.chemin[1];
+  const fab = ['ici', 'personnes', 'souvenirs', 'journal', 'groupes'].includes(o) && !(o === 'souvenirs' && route.value.chemin[1]);
   return (
     <div class="app">
       <a class="saut" href="#contenu">
@@ -103,13 +122,13 @@ export function App() {
       <nav class="barre-onglets" aria-label="Navigation principale">
         <div class="marque">
           <span class="logo" aria-hidden="true">
-            <Icon n="souvenirs" taille={22} />
+            <Icon n="souvenirs" taille={20} epaisseur={2} />
           </span>
           <span>Omiyage</span>
         </div>
         {ONGLETS.map(([id, l, ic]) => (
-          <a href={'#/' + id} class={'onglet' + (o === id || (id === 'personnes' && o === 'groupes') ? ' actif' : '')} aria-current={o === id ? 'page' : undefined}>
-            <Icon n={ic} taille={22} />
+          <a href={'#/' + id} class={'onglet' + (ongletActif(o, id) ? ' actif' : '')} aria-current={ongletActif(o, id) ? 'page' : undefined}>
+            <Icon n={ic} taille={24} epaisseur={ongletActif(o, id) ? 2.1 : 1.8} />
             <span>{l}</span>
           </a>
         ))}
@@ -122,7 +141,7 @@ export function App() {
         <header class="entete">
           <span class="entete-voyage">{v.nom}</span>
           <a href="#/parametres" class="btn-icone entete-reglages" aria-label="Paramètres">
-            <Icon n="reglages" />
+            <Icon n="reglages" taille={22} />
           </a>
         </header>
         <BandeauInstallation />
@@ -132,12 +151,13 @@ export function App() {
         </main>
       </div>
       {fab && (
-        <button class="fab" aria-label="Ajouter une idée ou un achat" onClick={() => ouvrir('Ajouter', () => <ChoixSaisie />)}>
+        <button class="fab" aria-label="Ajouter une idée ou un achat" onClick={() => ouvrirSaisie()}>
           <Icon n="plus" taille={28} />
         </button>
       )}
       <Feuilles />
       <ToastView />
+      <Fantome />
     </div>
   );
 }

@@ -243,13 +243,24 @@ export function Texte(props: {
   id?: string;
   onBlur?: () => void;
   'aria-label'?: string;
+  grand?: boolean;
 }) {
-  const { valeur, onValeur, autoFocus, onBlur, ...rest } = props;
+  const { valeur, onValeur, autoFocus, onBlur, grand, ...rest } = props;
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (autoFocus) setTimeout(() => ref.current?.focus(), 50);
   }, []);
-  return <input ref={ref} type="text" value={valeur} onInput={(e) => onValeur((e.target as HTMLInputElement).value)} onBlur={onBlur} {...rest} />;
+  return (
+    <input
+      ref={ref}
+      type="text"
+      class={grand ? 'champ-grand' : undefined}
+      value={valeur}
+      onInput={(e) => onValeur((e.target as HTMLInputElement).value)}
+      onBlur={onBlur}
+      {...rest}
+    />
+  );
 }
 
 export function ZoneTexte(props: { valeur: string; onValeur: (v: string) => void; placeholder?: string; rows?: number; id?: string }) {

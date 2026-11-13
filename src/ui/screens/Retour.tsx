@@ -29,7 +29,7 @@ export function Retour() {
   const q = route.value.query.get('section') as Onglet | null;
   const [onglet, setOnglet] = useState<Onglet>(q ?? (v.detaxeActive ? 'detaxe' : 'douane'));
   return (
-    <div class="ecran">
+    <div class="ecran etroit">
       <div class="ecran-tete">
         <h1>Retour</h1>
       </div>

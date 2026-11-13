@@ -203,10 +203,10 @@ export function RetourChamps(props: { valeur: Retour; onChange: (m: Partial<Reto
 export function Miniature({ id, taille = 44 }: { id?: string; taille?: number }) {
   void versionPhotos.value;
   const url = urlMiniature(id);
-  if (!id) return <span class="mini-vide" style={{ width: taille, height: taille }} aria-hidden="true" />;
+  if (!id) return <span class="mini-vide" style={{ width: `${taille}px`, height: `${taille}px` }} aria-hidden="true" />;
   return url ? (
     <img class="miniature" src={url} width={taille} height={taille} alt="" />
   ) : (
-    <span class="mini-vide" style={{ width: taille, height: taille }} aria-hidden="true" />
+    <span class="mini-vide" style={{ width: `${taille}px`, height: `${taille}px` }} aria-hidden="true" />
   );
 }
